@@ -4,31 +4,6 @@ from machine import Pin, PWM
 import time
 
 PIN_PWM_M1 = 4
-print("\n--- Problem 3: Average of numbers with while and sentinel ---")
-SENTINEL_VALUE = -1.0
-total_sum = 0.0
-count = 0
-
-while True:
-	number_text = input("Enter a number or -1 to finish: ").strip()
-	try:
-		number = float(number_text)
-	except ValueError:
-		print("Error: invalid input")
-		continue
-	if number == SENTINEL_VALUE:
-		break
-	total_sum += number
-	count += 1
-
-if count == 0:
-	print("Error: no data")
-else:
-	average_value = total_sum / count
-	print(f"Count: {count}")
-	print(f"Average: {average_value}")
-
-
 PIN_PWM_M2 = 5
 PIN_PWM_M3 = 6
 PIN_PWM_M4 = 7
