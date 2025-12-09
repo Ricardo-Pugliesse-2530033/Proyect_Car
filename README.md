@@ -3,7 +3,7 @@
 Este proyecto permite controlar un carro robot basado en ESP32-S3 usando Bluetooth Low Energy (BLE).
 El control se realiza desde esta página web:
 
-https://ai.studio/apps/drive/1Tx6DSF5-fUQnsCF_Ufs3YaURe3OeP7iy?fullscreenApplet=true
+https://6937cc04e718eb102e289199--cute-pothos-cb6f4b.netlify.app/
 
 El firmware MicroPython que corre en la placa está en `SRC/main.py` y expone un servicio BLE tipo UART para recibir comandos de movimiento.
 
@@ -88,7 +88,7 @@ El valor de velocidad por defecto es `150`.
 2. Asegúrate de que el Bluetooth de tu dispositivo (PC o móvil) está activado.
 3. Abre la página:
 
-	 https://ai.studio/apps/drive/1Tx6DSF5-fUQnsCF_Ufs3YaURe3OeP7iy?fullscreenApplet=true
+	https://6937cc04e718eb102e289199--cute-pothos-cb6f4b.netlify.app/
 
 4. Busca el dispositivo BLE con nombre `ESP32-S3-Carro` y conéctate.
 5. Usa los controles de la página (botones/direcciones) para enviar comandos:
