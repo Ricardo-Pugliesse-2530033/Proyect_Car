@@ -3,27 +3,21 @@ import machine
 from machine import Pin, PWM
 import time
 
-PIN_PWM_M1 = 4
-PIN_PWM_M2 = 5
-PIN_PWM_M3 = 6
-PIN_PWM_M4 = 7
 
-PIN_M1_IN1 = 15
-PIN_M1_IN2 = 16
-PIN_M2_IN3 = 17
-PIN_M2_IN4 = 18
+PIN_TRACCION_A = 15
+PIN_TRACCION_B = 16
 
-PIN_M3_IN1 = 8
-PIN_M3_IN2 = 10
-PIN_M4_IN3 = 11
-PIN_M4_IN4 = 12
+
+PIN_DIRECCION_A = 17
+PIN_DIRECCION_B = 18
+
 
 PWM_FREQ = 1000
+
 
 _UART_UUID = bluetooth.UUID("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
 _UART_TX = bluetooth.UUID("6E400003-B5A3-F393-E0A9-E50E24DCCA9E")
 _UART_RX = bluetooth.UUID("6E400002-B5A3-F393-E0A9-E50E24DCCA9E")
-
 
 class BLEUART:
     def __init__(self, name="ESP32-S3-Carro"):
@@ -40,17 +34,17 @@ class BLEUART:
         self._advertise(name)
 
     def _irq(self, event, data):
-        if event == 1:
+        if event == 1: # _IRQ_CENTRAL_CONNECT
             conn_handle, _, _ = data
             self._connections.add(conn_handle)
-            print("S3 Bluetooth: Dispositivo Conectado")
-        elif event == 2:
+            print("Bluetooth: Dispositivo Conectado")
+        elif event == 2: # _IRQ_CENTRAL_DISCONNECT
             conn_handle, _, _ = data
             if conn_handle in self._connections:
                 self._connections.remove(conn_handle)
-            print("S3 Bluetooth: Desconectado")
+            print("Bluetooth: Desconectado")
             self._advertise()
-        elif event == 3:
+        elif event == 3: # _IRQ_GATTS_WRITE
             conn_handle, value_handle = data
             if value_handle == self._handle_rx:
                 received = self._ble.gatts_read(self._handle_rx)
@@ -73,100 +67,125 @@ class BLEUART:
                 pass
 
 class Motor:
-    def __init__(self, pin_in1, pin_in2, pin_pwm):
-        self.in1 = Pin(pin_in1, Pin.OUT)
-        self.in2 = Pin(pin_in2, Pin.OUT)
-        self.pwm = PWM(Pin(pin_pwm), freq=PWM_FREQ)
-        self.pwm.duty_u16(0)
+    """
+    Controla un motor DC usando 2 pines en modo PWM.
+    Esto ahorra el uso de un pin 'Enable' extra.
+    """
+    def __init__(self, pin_a, pin_b):
+        # Inicializamos ambos pines como PWM
+        self.pwm_a = PWM(Pin(pin_a), freq=PWM_FREQ)
+        self.pwm_b = PWM(Pin(pin_b), freq=PWM_FREQ)
+        self.stop()
 
     def mover(self, velocidad):
         """
-        velocidad: Valor entre -255 (atrás max) y 255 (adelante max).
+        velocidad: Valor entre -255 (atrás) y 255 (adelante).
         """
+        velocidad = max(min(velocidad, 255), -255) # Limitar rango
+        
+        # Convertir escala 0-255 a 0-65535 (u16 de MicroPython)
         duty = int(abs(velocidad) * 65535 / 255)
 
-        if duty > 65535:
-            duty = 65535
-
-        self.pwm.duty_u16(duty)
-
         if velocidad > 0:
-            self.in1.value(1)
-            self.in2.value(0)
+            # Adelante: Pin A con PWM, Pin B en 0
+            self.pwm_a.duty_u16(duty)
+            self.pwm_b.duty_u16(0)
         elif velocidad < 0:
-            self.in1.value(0)
-            self.in2.value(1)
+            # Atrás: Pin A en 0, Pin B con PWM
+            self.pwm_a.duty_u16(0)
+            self.pwm_b.duty_u16(duty)
         else:
             self.stop()
 
     def stop(self):
-        self.in1.value(0)
-        self.in2.value(0)
-        self.pwm.duty_u16(0)
+        self.pwm_a.duty_u16(0)
+        self.pwm_b.duty_u16(0)
 
-motor_m1 = Motor(PIN_M1_IN1, PIN_M1_IN2, PIN_PWM_M1)
-motor_m2 = Motor(PIN_M2_IN3, PIN_M2_IN4, PIN_PWM_M2)
-motor_m3 = Motor(PIN_M3_IN1, PIN_M3_IN2, PIN_PWM_M3)
-motor_m4 = Motor(PIN_M4_IN3, PIN_M4_IN4, PIN_PWM_M4)
 
-velocidad_actual = 150
 
+
+motor_traccion = Motor(PIN_TRACCION_A, PIN_TRACCION_B)
+
+
+motor_direccion = Motor(PIN_DIRECCION_A, PIN_DIRECCION_B)
+
+
+velocidad_traccion_val = 200  
+velocidad_giro_val = 255      
 
 def procesar_comando(data_bytes):
-    global velocidad_actual
+    global velocidad_traccion_val, velocidad_giro_val
 
     try:
         texto = data_bytes.decode('utf-8').strip().upper()
-        print("Cmd:", texto)
+
     except:
         return
 
     if not texto:
         return
 
+
+    
+    # AVANZAR
     if texto == 'F':
-        motor_m1.mover(velocidad_actual)
-        motor_m2.mover(velocidad_actual)
-        motor_m3.mover(velocidad_actual)
-        motor_m4.mover(velocidad_actual)
+        motor_traccion.mover(velocidad_traccion_val)
+        motor_direccion.stop() 
 
+    # RETROCEDER
     elif texto == 'B':
-        motor_m1.mover(-velocidad_actual)
-        motor_m2.mover(-velocidad_actual)
-        motor_m3.mover(-velocidad_actual)
-        motor_m4.mover(-velocidad_actual)
+        motor_traccion.mover(-velocidad_traccion_val)
+        motor_direccion.stop()
 
+    # IZQUIERDA
     elif texto == 'L':
-        motor_m1.mover(-velocidad_actual)
-        motor_m3.mover(-velocidad_actual)
-        motor_m2.mover(velocidad_actual)
-        motor_m4.mover(velocidad_actual)
+        motor_direccion.mover(velocidad_giro_val)
 
+
+    # DERECHA
     elif texto == 'R':
-        motor_m1.mover(velocidad_actual)
-        motor_m3.mover(velocidad_actual)
-        motor_m2.mover(-velocidad_actual)
-        motor_m4.mover(-velocidad_actual)
+        motor_direccion.mover(-velocidad_giro_val)
 
+    # DETENER TODO
     elif texto == 'S':
-        motor_m1.stop()
-        motor_m2.stop()
-        motor_m3.stop()
-        motor_m4.stop()
+        motor_traccion.stop()
+        motor_direccion.stop()
+        
 
-    elif texto.startswith('V'):
+    
+    elif texto == 'G': 
+        motor_traccion.mover(velocidad_traccion_val)
+        motor_direccion.mover(velocidad_giro_val)
+        
+    elif texto == 'I': 
+        motor_traccion.mover(velocidad_traccion_val)
+        motor_direccion.mover(-velocidad_giro_val)
+        
+    elif texto == 'H': 
+        motor_traccion.mover(-velocidad_traccion_val)
+        motor_direccion.mover(velocidad_giro_val)
+        
+    elif texto == 'J': 
+        motor_traccion.mover(-velocidad_traccion_val)
+        motor_direccion.mover(-velocidad_giro_val)
+
+    elif texto.startswith('V') or texto.startswith('v'):
         try:
             val_str = texto[1:]
             nueva_vel = int(val_str)
             if 0 <= nueva_vel <= 255:
-                velocidad_actual = nueva_vel
-                print(f"Velocidad: {velocidad_actual}")
+                velocidad_traccion_val = nueva_vel
+                print(f"Velocidad ajustada: {velocidad_traccion_val}")
         except:
             pass
+    
+    elif texto == '0': velocidad_traccion_val = 0
+    elif texto == '1': velocidad_traccion_val = 25
+    elif texto == '9': velocidad_traccion_val = 250
+    elif texto == 'q': velocidad_traccion_val = 255
 
-
-print("Iniciando Carro Robot ESP32-S3...")
-ble = BLEUART(name="ESP32-S3-Carro")
+print("Iniciando:")
+ble = BLEUART(name="ESP32-S3-Carro-Piton")
 ble.set_rx_handler(procesar_comando)
 
 while True:
