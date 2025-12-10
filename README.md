@@ -128,8 +128,6 @@ código, esquemas eléctricos, pruebas y conclusiones.
 
 ---
 
-## Licencia 📜
-Copyright (c) 2025 Julio
 
 
 
@@ -137,12 +135,12 @@ Copyright (c) 2025 Julio
 
 ## Proyecto: Carro Robot ESP32-S3 controlado por Bluetooth
 
-Este proyecto permite controlar un carro robot basado en ESP32-S3 usando Bluetooth Low Energy (BLE).
-El control se realiza desde esta página web:
+Esta sección describe el **software en MicroPython** que corre en el ESP32-S3, definido en `SRC/main.py`.
+El carro se controla desde la siguiente página web (cliente BLE UART):
 
 https://6937cc04e718eb102e289199--cute-pothos-cb6f4b.netlify.app/
 
-El firmware MicroPython que corre en la placa está en `SRC/main.py` y expone un servicio BLE tipo UART para recibir comandos de movimiento.
+El ESP32 expone un servicio BLE tipo UART y recibe comandos de texto para mover el motor de **tracción** y el de **dirección**.
 
 ---
 
@@ -161,7 +159,7 @@ Paquetes clave:
 
 ---
 
-## 2. Configurar el puerto y la versión de firmware
+## 1. Configurar el puerto y la versión de firmware
 
 Edita el archivo `uploadcode.bat` y ajusta:
 
@@ -180,7 +178,7 @@ ampy --port COM4 put SRC/main.py
 
 ---
 
-## 3. Flashear y subir el código
+## 2. Flashear y subir el código
 
 1. Conecta la placa ESP32-S3 por USB.
 2. Asegúrate de que el puerto en `uploadcode.bat` es correcto.
@@ -197,51 +195,90 @@ Esto hará:
 
 ---
 
-## 4. Cómo funciona el código
+## 3. Cómo funciona el código (`SRC/main.py`)
 
-El archivo `SRC/main.py` hace lo siguiente:
+Resumen del comportamiento principal del script actual:
 
-- Configura 4 motores con PWM (pines `PIN_PWM_M1..M4` y pines de dirección `PIN_Mx_INy`).
-- Crea un servicio BLE UART con nombre `ESP32-S3-Carro` usando la clase `BLEUART`.
-- Espera comandos de texto por BLE y los procesa en la función `procesar_comando`.
+- Define pines de **tracción**: `PIN_TRACCION_A` y `PIN_TRACCION_B`.
+- Define pines de **dirección**: `PIN_DIRECCION_A` y `PIN_DIRECCION_B`.
+- Configura una frecuencia PWM común `PWM_FREQ = 1000` Hz.
+- Implementa la clase `BLEUART`, que crea un servicio BLE UART y anuncia el dispositivo.
+- Implementa la clase `Motor`, que usa **dos pines PWM por motor** (A y B) para controlar **sentido** y **velocidad** sin necesitar un pin `EN` extra:
+  - Adelante: A con PWM, B en 0.
+  - Atrás: A en 0, B con PWM.
+  - Stop: ambos en 0.
+- Crea dos instancias de `Motor`:
+  - `motor_traccion`: controla el motor que mueve el carrito hacia adelante/atrás.
+  - `motor_direccion`: controla el motor que gira las llantas.
+- Define velocidades base:
+  - `velocidad_traccion_val = 200` (tracción).
+  - `velocidad_giro_val = 255` (dirección, máxima fuerza).
+- Registra la función `procesar_comando` como callback BLE para procesar los comandos recibidos.
 
-Comandos soportados (enviados como texto ASCII):
+### Comandos soportados
 
-- `F` → Avanzar (Forward).
-- `B` → Retroceder (Backward).
-- `L` → Girar a la izquierda sobre su eje.
-- `R` → Girar a la derecha sobre su eje.
-- `S` → Stop (detener todos los motores).
-- `VXXX` → Cambiar velocidad, donde `XXX` es un número entre 0 y 255.
-	- Ejemplo: `V200` cambia la velocidad a 200.
+Todos los comandos llegan como texto (caracteres) vía BLE UART.
 
-El valor de velocidad por defecto es `150`.
+**Movimientos simples**
+
+- `F` → Avanzar recto.
+  - La tracción se mueve hacia adelante (`motor_traccion.mover(velocidad_traccion_val)`).
+  - La dirección se centra/detiene (`motor_direccion.stop()`).
+- `B` → Retroceder recto.
+- `L` → Girar a la izquierda (mueve solo el motor de dirección en un sentido).
+- `R` → Girar a la derecha (mueve solo el motor de dirección en el sentido contrario).
+- `S` → Detener todo (tracción y dirección en stop).
+
+**Movimientos combinados (avance/retroceso + giro)**
+
+Estos comandos permiten que el carrito avance o retroceda **mientras gira**:
+
+- `G` → Avanzar y girar (sentido de giro depende del cableado del motor de dirección).
+- `I` → Avanzar y girar hacia el lado opuesto a `G`.
+- `H` → Retroceder y girar (mismo sentido que `G`).
+- `J` → Retroceder y girar hacia el lado opuesto a `H`.
+
+**Ajuste de velocidad de tracción**
+
+- `VXXX` o `vXXX` → Ajusta `velocidad_traccion_val` a un valor entre 0 y 255.
+  - Ejemplo: `V180` pone la velocidad de tracción en 180.
+
+Presets rápidos (según el código):
+
+- `0` → `velocidad_traccion_val = 0` (parado).
+- `1` → `velocidad_traccion_val = 25` (muy lento).
+- `9` → `velocidad_traccion_val = 250` (muy rápido).
+- `q` → `velocidad_traccion_val = 255` (máxima velocidad).
 
 ---
 
-## 5. Uso con la página web de control
+## 4. Uso con la página web de control
 
 1. Enciende el ESP32-S3 con el código ya cargado.
-2. Asegúrate de que el Bluetooth de tu dispositivo (PC o móvil) está activado.
-3. Abre la página:
+2. Activa el Bluetooth de tu dispositivo (PC o móvil).
+3. Abre la página web de control:
 
-	https://6937cc04e718eb102e289199--cute-pothos-cb6f4b.netlify.app/
+   https://6937cc04e718eb102e289199--cute-pothos-cb6f4b.netlify.app/
 
-4. Busca el dispositivo BLE con nombre `ESP32-S3-Carro` y conéctate.
-5. Usa los controles de la página (botones/direcciones) para enviar comandos:
-	 - Adelante, atrás, izquierda, derecha, parar y ajustar velocidad.
+4. Busca el dispositivo BLE con nombre **`ESP32-S3-Carro-Piton`** y conéctate.
+5. Usa los controles de la página (botones/direcciones/slider) para enviar comandos:
+   - Adelante (`F`), atrás (`B`), girar (`L`, `R`), detener (`S`).
+   - Combinados (`G`, `I`, `H`, `J`) para curvas hacia adelante o hacia atrás.
+   - Slider o campos numéricos para enviar `VXXX` y cambiar la velocidad de tracción.
 
-La página actúa como un cliente BLE UART, enviando las letras/comandos que el código interpreta para mover el carro.
+La página actúa como un cliente BLE UART: envía los caracteres y el ESP32 ejecuta la lógica de `procesar_comando` para mover el carrito.
 
 ---
 
-## 6. Notas y recomendaciones
+##  Notas y recomendaciones
 
-- Verifica que el mapeo de pines (`PIN_PWM_Mx`, `PIN_Mx_INy`) coincide con tu cableado real de los drivers de motor.
-- Si cambias pines en el hardware, también debes actualizar los valores en `SRC/main.py`.
-- Si el carro no responde, comprueba:
-	- Que el dispositivo BLE `ESP32-S3-Carro` esté visible y conectado.
-	- Que la alimentación de los motores (batería/fuente) sea suficiente.
-	- Que los comandos que envía la página coincidan con los listados arriba.
+- Verifica que el mapeo de pines (`PIN_TRACCION_A`, `PIN_TRACCION_B`, `PIN_DIRECCION_A`, `PIN_DIRECCION_B`) coincide con el cableado real hacia el driver L298N (IN1..IN4).
+- Asegúrate de compartir **tierra común (GND)** entre fuente de motores, L298N y ESP32, como se muestra en el diagrama.
+- Si el sentido de giro no coincide (
+  por ejemplo, `L` gira hacia la derecha), intercambia los cables A/B del motor de dirección o invierte el signo en el código.
+- Si el carrito no responde:
+  - Revisa que el dispositivo BLE `ESP32-S3-Carro-Piton` esté visible y conectado.
+  - Comprueba la alimentación de los motores (batería/fuente) y del ESP32.
+  - Verifica que la página esté enviando los comandos descritos arriba.
 
 
