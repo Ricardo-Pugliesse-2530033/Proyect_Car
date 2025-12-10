@@ -281,4 +281,4 @@ La página actúa como un cliente BLE UART: envía los caracteres y el ESP32 eje
   - Comprueba la alimentación de los motores (batería/fuente) y del ESP32.
   - Verifica que la página esté enviando los comandos descritos arriba.
 
-
+# Excelente README 
