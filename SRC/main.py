@@ -3,6 +3,7 @@ import machine
 from machine import Pin, PWM
 import time
 
+# CODIGO DE CARRITO ESP32-S3 CON BLUETOOTH UART
 
 PIN_TRACCION_A = 15
 PIN_TRACCION_B = 16
