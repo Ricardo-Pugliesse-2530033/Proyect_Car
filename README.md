@@ -280,5 +280,3 @@ La página actúa como un cliente BLE UART: envía los caracteres y el ESP32 eje
   - Revisa que el dispositivo BLE `ESP32-S3-Carro-Piton` esté visible y conectado.
   - Comprueba la alimentación de los motores (batería/fuente) y del ESP32.
   - Verifica que la página esté enviando los comandos descritos arriba.
-
-# Excelente README 
